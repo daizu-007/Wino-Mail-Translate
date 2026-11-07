@@ -4533,6 +4533,8 @@
   "MailTranslation_SettingsFailed": "Translation settings could not be loaded or saved. Try again.",
   "MailTranslation_SettingsSaved": "Translation settings saved.",
   "MailTranslation_TranslatedTo": "Translated to {0}",
+  "MailTranslation_Progress": "Translating: {0} of {1} text parts complete",
+  "MailTranslation_WaitingForQuota": "Waiting {0}s for the provider's rate limit ({1} of {2} text parts complete)",
   "MailTranslation_ShowingOriginal": "Showing original message",
   "MailTranslation_Settings": "Translation settings"
 }

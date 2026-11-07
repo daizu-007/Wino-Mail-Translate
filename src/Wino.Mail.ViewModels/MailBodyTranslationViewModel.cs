@@ -83,9 +83,16 @@ public sealed partial class MailBodyTranslationViewModel(IMailTranslationService
                 return;
             }
             var settings = settingsStore.Load();
+            var progress = new Progress<MailTranslationProgress>(value =>
+            {
+                if (version != _contentVersion || !ReferenceEquals(_request, request) || request.IsCancellationRequested) return;
+                Status = value.WaitingSeconds > 0
+                    ? string.Format(Translator.MailTranslation_WaitingForQuota, value.WaitingSeconds, value.CompletedParts, value.TotalParts)
+                    : string.Format(Translator.MailTranslation_Progress, value.CompletedParts, value.TotalParts);
+            });
             var translated = _translatedBody is { } cached && settings == _translatedSettings
                 ? cached
-                : await service.TranslateHtmlAsync(_originalHtml, settings, request.Token);
+                : await service.TranslateHtmlAsync(_originalHtml, settings, request.Token, progress);
             if (request.IsCancellationRequested || version != _contentVersion) return;
             _translatedBody = translated;
             _translatedSettings = settings;

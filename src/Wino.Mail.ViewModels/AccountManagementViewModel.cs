@@ -113,30 +113,13 @@ public partial class AccountManagementViewModel : AccountManagementPageViewModel
 
 
     [RelayCommand]
-    private async Task AddNewAccountAsync()
+    private Task AddNewAccountAsync()
     {
-        if (IsAccountCreationBlocked)
-        {
-            // Nothing is sold on this platform (Android v1): explain the limit without a purchase button.
-            if (!PlatformCapabilities.Purchases)
-            {
-                await DialogService.ShowMessageAsync(Translator.DialogMessage_AccountLimitMessage, Translator.DialogMessage_AccountLimitTitle, WinoCustomMessageDialogIcon.Warning);
-                return;
-            }
-
-            var isPurchaseClicked = await DialogService.ShowConfirmationDialogAsync(Translator.DialogMessage_AccountLimitMessage, Translator.DialogMessage_AccountLimitTitle, Translator.Buttons_Purchase);
-
-            if (!isPurchaseClicked) return;
-
-            await PurchaseUnlimitedAccountAsync();
-
-            return;
-        }
-
         Messenger.Send(new BreadcrumbNavigationRequested(
             Translator.WelcomeWizard_Step2Title,
             WinoPage.ProviderSelectionPage,
             ProviderSelectionNavigationContext.CreateForSettingsAddAccount()));
+        return Task.CompletedTask;
     }
 
     public Task StartAddNewAccountAsync() => AddNewAccountAsync();

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
@@ -22,7 +22,7 @@ public abstract partial class AccountManagementPageViewModelBase : CoreBaseViewM
     public ObservableCollection<IAccountProviderDetailViewModel> Accounts { get; set; } = [];
     public ObservableCollection<IAccountProviderDetailViewModel> StartupAccounts { get; } = [];
 
-    public bool IsPurchasePanelVisible => !HasUnlimitedAccountProduct && PlatformCapabilities.Purchases;
+    public bool IsPurchasePanelVisible => false;
     public int UsedAccountCount => Accounts?.Sum(account => account.HoldingAccountCount) ?? 0;
     public bool IsAccountCreationAlmostOnLimit => UsedAccountCount == FREE_ACCOUNT_COUNT - 1;
     public bool HasAccountsDefined => Accounts != null && Accounts.Any();
@@ -163,7 +163,6 @@ public abstract partial class AccountManagementPageViewModelBase : CoreBaseViewM
         {
             HasUnlimitedAccountProduct = hasUnlimitedAccountProduct;
             IsWinoAccountSignedIn = isWinoAccountSignedIn;
-            IsAccountCreationBlocked = !hasUnlimitedAccountProduct && UsedAccountCount >= FREE_ACCOUNT_COUNT;
         });
     }
 

@@ -23,7 +23,6 @@ public sealed partial class WinoAccountManagementPageFragment
     {
         yield return IntelligencePurchaseCard();
         yield return IntelligenceExpander();
-        yield return UnlimitedAccountsCard();
         if (SellsAddOns) yield return StoreRedeemCard();
     }
 

@@ -46,20 +46,21 @@ public class TranslationService : ITranslationService
 
         if (ignoreCurrentLanguageCheck && isInitialized) return;
 
+        var fallbackLookups = await LoadTranslationsAsync(DefaultAppLanguage).ConfigureAwait(false);
+        var translationLookups = language == DefaultAppLanguage
+            ? fallbackLookups
+            : await LoadTranslationsAsync(language).ConfigureAwait(false);
+
         var currentDictionary = Translator.Resources;
-        await using var resourceStream = Core.Domain.Translations.WinoTranslationDictionary.GetLanguageStream(language);
+        currentDictionary.Clear();
 
-        var streamValue = await new StreamReader(resourceStream).ReadToEndAsync().ConfigureAwait(false);
-
-        var translationLookups = JsonSerializer.Deserialize(streamValue, BasicTypesJsonContext.Default.DictionaryStringString);
-
-        // Insert new translation key-value pairs.
-        // Overwrite existing values for the same keys.
+        foreach (var pair in fallbackLookups)
+            currentDictionary[pair.Key] = pair.Value;
 
         foreach (var pair in translationLookups)
         {
-            // Replace existing value.
-            currentDictionary[pair.Key] = pair.Value;
+            if (!string.IsNullOrWhiteSpace(pair.Value))
+                currentDictionary[pair.Key] = pair.Value;
         }
 
         _preferencesService.CurrentLanguage = language;
@@ -74,6 +75,16 @@ public class TranslationService : ITranslationService
 
         isInitialized = true;
         WeakReferenceMessenger.Default.Send(new LanguageChanged());
+    }
+
+    private static async Task<Dictionary<string, string>> LoadTranslationsAsync(AppLanguage language)
+    {
+        await using var resourceStream = Core.Domain.Translations.WinoTranslationDictionary.GetLanguageStream(language);
+        using var reader = new StreamReader(resourceStream);
+        var streamValue = await reader.ReadToEndAsync().ConfigureAwait(false);
+
+        return JsonSerializer.Deserialize(streamValue, BasicTypesJsonContext.Default.DictionaryStringString)
+            ?? throw new InvalidDataException($"Translation resource for {language} is invalid.");
     }
 
     private AppLanguage GetInitialLanguage()

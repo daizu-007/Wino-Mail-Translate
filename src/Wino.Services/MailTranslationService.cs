@@ -25,9 +25,9 @@ public sealed partial class MailTranslationService(IMailContentProjector project
 {
     private readonly HttpClient _http = new(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromMinutes(5) };
     private readonly SemaphoreSlim _sarashinaGate = new(1, 1);
-    private DateTimeOffset _nextSarashinaRequest;
 
-    public async Task<MailBodyTranslationResult> TranslateHtmlAsync(string html, MailTranslationSettings settings, CancellationToken cancellationToken = default)
+    public async Task<MailBodyTranslationResult> TranslateHtmlAsync(string html, MailTranslationSettings settings, CancellationToken cancellationToken = default,
+        IProgress<MailTranslationProgress>? progress = null)
     {
         Validate(settings);
         var apiKey = settingsStore.GetApiKey(settings.Provider);
@@ -38,7 +38,10 @@ public sealed partial class MailTranslationService(IMailContentProjector project
 
         var projection = projector.ProjectRenderedHtml(html, MailContentProjectionProfile.Translation);
         var translated = new Dictionary<string, string>(StringComparer.Ordinal);
-        var cache = new Dictionary<string, string>(StringComparer.Ordinal);
+        var chunkLimit = settings.Provider == MailTranslationProvider.Sarashina ? SarashinaCharacterLimit : 1400;
+        var cache = settings.Provider == MailTranslationProvider.Sarashina
+            ? await TranslateSarashinaSegmentsAsync(projection.Projection.Segments, settings, apiKey, cancellationToken, progress).ConfigureAwait(false)
+            : new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var segment in projection.Projection.Segments)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -53,7 +56,7 @@ public sealed partial class MailTranslationService(IMailContentProjector project
                     output.Append(part);
                     continue;
                 }
-                foreach (var chunk in SplitText(part))
+                foreach (var chunk in SplitText(part, chunkLimit))
                 {
                     var text = chunk.Trim();
                     if (text.Length == 0 || !text.Any(char.IsLetter))
@@ -61,10 +64,10 @@ public sealed partial class MailTranslationService(IMailContentProjector project
                         output.Append(chunk);
                         continue;
                     }
-                    var cacheKey = context + "\0" + text;
+                    var cacheKey = settings.Provider == MailTranslationProvider.Sarashina ? text : context + "\0" + text;
                     if (!cache.TryGetValue(cacheKey, out var result))
                     {
-                        result = await TranslateTextAsync(text, context, settings, apiKey, cancellationToken).ConfigureAwait(false);
+                        result = await SendAsync(text, context, settings, apiKey, cancellationToken).ConfigureAwait(false);
                         cache.Add(cacheKey, result);
                     }
                     var start = chunk.Length - chunk.TrimStart().Length;
@@ -81,24 +84,8 @@ public sealed partial class MailTranslationService(IMailContentProjector project
         return new MailBodyTranslationResult(translatedHtml, new VisibleTextExtractor().Extract(translatedHtml));
     }
 
-    private async Task<string> TranslateTextAsync(string text, string context, MailTranslationSettings settings, string apiKey, CancellationToken token)
-    {
-        if (settings.Provider == MailTranslationProvider.Sarashina)
-        {
-            await _sarashinaGate.WaitAsync(token).ConfigureAwait(false);
-            try
-            {
-                var delay = _nextSarashinaRequest - DateTimeOffset.UtcNow;
-                if (delay > TimeSpan.Zero) await Task.Delay(delay, token).ConfigureAwait(false);
-                _nextSarashinaRequest = DateTimeOffset.UtcNow.AddSeconds(10.1);
-                return await SendAsync(text, context, settings, apiKey, token).ConfigureAwait(false);
-            }
-            finally { _sarashinaGate.Release(); }
-        }
-        return await SendAsync(text, context, settings, apiKey, token).ConfigureAwait(false);
-    }
-
-    private async Task<string> SendAsync(string text, string context, MailTranslationSettings settings, string apiKey, CancellationToken token)
+    private async Task<string> SendAsync(string text, string context, MailTranslationSettings settings, string apiKey, CancellationToken token,
+        Action<TimeSpan>? waiting = null)
     {
         var target = LanguageCode(settings.TargetLanguage, settings.Provider);
         var source = string.IsNullOrWhiteSpace(settings.SourceLanguage) ? string.Empty : LanguageCode(settings.SourceLanguage, settings.Provider);
@@ -151,21 +138,31 @@ public sealed partial class MailTranslationService(IMailContentProjector project
 
         for (var attempt = 0; ; attempt++)
         {
+            if (settings.Provider == MailTranslationProvider.Sarashina)
+                await WaitForSarashinaQuotaAsync(token, waiting).ConfigureAwait(false);
+            using var requestCancellation = settings.Provider == MailTranslationProvider.Sarashina
+                ? CancellationTokenSource.CreateLinkedTokenSource(token)
+                : null;
+            requestCancellation?.CancelAfter(TimeSpan.FromSeconds(60));
+            var requestToken = requestCancellation?.Token ?? token;
             using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
             if (!string.IsNullOrWhiteSpace(apiKey)) request.Headers.Authorization = new AuthenticationHeaderValue(authorization, apiKey);
             request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
-            using var response = await _http.SendAsync(request, token).ConfigureAwait(false);
+            using var response = await _http.SendAsync(request, requestToken).ConfigureAwait(false);
             if (response.StatusCode == HttpStatusCode.TooManyRequests && attempt < 2)
             {
-                var retry = response.Headers.RetryAfter?.Delta ?? (response.Headers.RetryAfter?.Date - DateTimeOffset.UtcNow) ?? TimeSpan.FromSeconds(15 * (attempt + 1));
+                var retry = response.Headers.RetryAfter?.Delta ?? (response.Headers.RetryAfter?.Date - DateTimeOffset.UtcNow)
+                    ?? TimeSpan.FromSeconds(settings.Provider == MailTranslationProvider.Sarashina ? 60 : 15 * (attempt + 1));
                 if (retry < TimeSpan.Zero) retry = TimeSpan.Zero;
                 if (retry > TimeSpan.FromMinutes(2)) retry = TimeSpan.FromMinutes(2);
+                waiting?.Invoke(retry);
                 await Task.Delay(retry, token).ConfigureAwait(false);
+                waiting?.Invoke(TimeSpan.Zero);
                 continue;
             }
             if (!response.IsSuccessStatusCode)
                 throw new InvalidOperationException(string.Format(CultureInfo.CurrentCulture, Translator.MailTranslation_HttpError, (int)response.StatusCode));
-            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token).ConfigureAwait(false));
+            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(requestToken).ConfigureAwait(false));
             var root = json.RootElement;
             string? result;
             if (settings.Provider == MailTranslationProvider.Sarashina)
@@ -224,9 +221,8 @@ public sealed partial class MailTranslationService(IMailContentProjector project
         return code switch { "zh-cn" => "zh-hans", "zh-tw" => "zh-hant", _ => code.Split('-')[0] };
     }
 
-    private static IEnumerable<string> SplitText(string text)
+    private static IEnumerable<string> SplitText(string text, int limit)
     {
-        const int limit = 1400;
         while (text.Length > limit)
         {
             var length = text.LastIndexOfAny(['\n', '.', '。', '!', '?', ' '], limit - 1, limit);

@@ -22,7 +22,6 @@ public sealed partial class WinoAccountManagementPageViewController
     {
         yield return IntelligencePurchaseCard();
         yield return IntelligenceExpander();
-        yield return UnlimitedAccountsCard();
         if (_capabilities.MicrosoftStore || _capabilities.AppleAppStore) yield return StoreRedeemCard();
     }
 
