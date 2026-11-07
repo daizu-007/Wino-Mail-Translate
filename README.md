@@ -32,9 +32,10 @@ Sarashinaの翻訳APIを用いた翻訳方式です。外部にデータ送信�
 https://www.winomail.app/pricing
 
 ## インストール
-1. [release](https://github.com/daizu-007/Wino-Mail-Translate/releases)から「WinoMailTranslate_バージョン_x64.zip」をダウンロード
-2. zipを解凍し、`pwsh -NoProfile -ExecutionPolicy Bypass -File .\install-local.ps1 -CertificatePath .\WinoMailTranslate.cer -ExpectedThumbprint 'AF81680204D210D836843DCC17D3862199EDB61C'`を実行
-3. UACが表示されるので確認して「はい」をクリック
+注: 配布予定でしたが依存ライブラリのライセンスが怪しいためとりやめました。ご自身でビルドしてください。
+1. ~~[release](https://github.com/daizu-007/Wino-Mail-Translate/releases)から「WinoMailTranslate_バージョン_x64.zip」をダウンロード~~
+2. ~~zipを解凍し、`pwsh -NoProfile -ExecutionPolicy Bypass -File .\install-local.ps1 -CertificatePath .\WinoMailTranslate.cer -ExpectedThumbprint 'AF81680204D210D836843DCC17D3862199EDB61C'`を実行~~
+3. ~~UACが表示されるので確認して「はい」をクリック~~
 
 ## 寄付
 Wino Mail Translateはあまり労力を書けずに作られた概念実証的側面を持つ小規模なフォークです。継続的なメンテナンスを行うつもりもありません。もし少しでもこのプロジェクトを気に入ったかたは、フォーク元である[Wino Mail](https://www.winomail.app/)のアドオン購入を検討してみてください。
