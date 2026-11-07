@@ -48,8 +48,17 @@ Wino Mailには2つのアドオンがあります。
 
 https://github.com/sponsors/bkaankose
 
-## AI Policy
+## AIポリシー
 このフォークの変更は、このREADMEを除きほぼすべて生成AIによってVibe Codeで行われました。いかなる問題が生じても一切の責任を負いませんし、サポートも行えません。ただし、CodexのGPT-6.1 Solはフォーク主であるdaizu-007よりも優秀なコーディング能力を持っています。
+
+## 変更内容
+変更日: 2026年11月7日
+変更者: daizu-007
+変更内容:
+- 独自の翻訳機能を追加
+- アカウント数制限を削除
+- ローカルでのビルド等実験用ファイルの追加
+- READMEの書き直し
 
 ## クレジット
 このプロジェクトは、GPL-3.0に基づく[Wino Mail](https://github.com/bkaankose/Wino-Mail)の非公式フォークです。  
