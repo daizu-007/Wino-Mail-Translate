@@ -72,6 +72,7 @@ public partial class MailRenderingPageViewModel : MailBaseViewModel,
     public IMailPrintPresenter PrintPresenter { get; set; }
     public Func<string, Task> RenderHtmlAsyncFunc { get; set; }
     public Func<Task> ClearRenderedHtmlAsyncFunc { get; set; }
+    public MailBodyTranslationViewModel MailTranslation { get; }
 
     #region Properties
 
@@ -255,10 +256,13 @@ public partial class MailRenderingPageViewModel : MailBaseViewModel,
         IRemoteContentRuleStore remoteContentRuleStore,
         ILinkSanitizer linkSanitizer,
         INavigationService navigationService,
+        IMailTranslationService mailTranslationService,
+        IMailTranslationSettingsStore mailTranslationSettingsStore,
         IAttachmentFileService attachmentFileService = null,
         ILinkBrowserService linkBrowserService = null)
     {
         _dialogService = dialogService;
+        MailTranslation = new MailBodyTranslationViewModel(mailTranslationService, mailTranslationSettingsStore);
         ExternalLauncher = externalLauncher;
         _linkBrowserService = linkBrowserService;
         _clipboardService = clipboardService;

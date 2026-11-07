@@ -12,6 +12,7 @@
   <a href="https://apps.microsoft.com/detail/Wino%20Mail/9NCRCVJC50WL?launch=true&mode=full">Microsoft Store</a>
   · <a href="https://github.com/bkaankose/Wino-Mail/releases">Release notes</a>
   · <a href="CONTRIBUTING.md">Contributing</a>
+  · <a href="README-JP.md">Windowsローカルビルド（日本語）</a>
 </p>
 
 ![Wino Mail screenshot](https://user-images.githubusercontent.com/12009960/232114528-2d2c8e3c-dbe7-429a-94e0-6aecc73bdf70.png)
@@ -62,6 +63,7 @@ All applications share the .NET backend, ViewModels, and translations. The downl
 - Offline workflows and local search
 - Background synchronization and toast notifications
 - WebView2-based mail reading and composition
+- [Message translation](docs/mail-translation.md) with OpenAI-compatible APIs, local PLaMo 3 Translate, Sarashina, and DeepL (Windows)
 - EML and ICS file integration
 - `mailto`, `webcal`, `webcals`, and Wino protocol activation
 

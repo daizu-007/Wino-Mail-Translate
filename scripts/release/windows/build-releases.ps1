@@ -11,6 +11,8 @@ Reads the source manifest version. Outputs verified packages under
 Run scripts/localization/translate_resources.py --apply before building, without asking.
 .PARAMETER SkipTranslation
 Build without translating and without asking. -NonInteractive alone also skips translation.
+.PARAMETER RuntimeFrameworkVersion
+Optionally select the Windows Release .NET runtime and Native AOT compiler version.
 #>
 [CmdletBinding()]
 param(
@@ -23,6 +25,7 @@ param(
     [ValidateSet('x86', 'x64', 'ARM64')][string[]]$Architectures = @('x64'),
     [string]$BetaAssetsPath,
     [string]$StoreTestCertificateThumbprint,
+    [string]$RuntimeFrameworkVersion,
     [string]$OutputRoot = $(if ($env:WINO_RELEASES_ROOT) { $env:WINO_RELEASES_ROOT } else { 'D:\Wino Releases' })
 )
 
@@ -352,6 +355,7 @@ function Get-ReleaseBuildArguments {
         '-p:Configuration=Release', "-p:Platform=$platform", "-p:ArtifactsPath=$buildArtifacts",
         "-p:NotificationHostPublishRoot=$notificationHosts\"
     )
+    if ($RuntimeFrameworkVersion) { $arguments += "-p:WinoReleaseRuntimeVersion=$RuntimeFrameworkVersion" }
     if ($Plan.Selection.Architectures.Count -eq 1) { $arguments += "-p:RuntimeIdentifiers=win-$($platform.ToLowerInvariant())" }
     if ($Restore) {
         return $arguments + @('-t:Restore', "-p:RestoreConfigFile=$(Join-Path $Plan.RepositoryRoot 'nuget.config')")

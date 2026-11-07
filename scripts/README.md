@@ -8,6 +8,8 @@ See the [Windows](../docs/harness/development-windows.md), [macOS](../docs/harne
 | --- | --- | --- | --- | --- |
 | Development | `development/windows/start-wino.ps1` | Windows | PowerShell 7.2+ | Check build inputs and output, then build if needed and launch the packaged Debug app |
 | Release | `release/windows/build-releases.ps1` | Windows | PowerShell 7 | Optionally translate resources, then build and package Store, Beta, and sideload releases |
+| Release | `release/windows/build-local.ps1` | Windows | PowerShell 7.2+ | Create or reuse a personal certificate and build a self-signed Release x64 bundle; optionally install it (see [README-JP](../README-JP.md)) |
+| Release | `release/windows/install-local.ps1` | Windows | PowerShell 7.2+ | Verify the expected signer, trust its public certificate through UAC, and install a personal bundle |
 | Release | `release/windows/publish-releases.ps1` | Windows | PowerShell 7 | Publish Beta and sideload releases to download.winomail.app |
 | Release | `release/windows/upload-sentry-symbols.ps1` | Windows | PowerShell 7 | Upload symbols for a selected release |
 | Release | `release/macos/build-macos-release.sh` | macOS | Bash | Optionally translate resources, then build the signed, notarized macOS DMG |

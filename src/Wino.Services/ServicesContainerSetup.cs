@@ -23,6 +23,12 @@ public static class ServicesContainerSetup
         services.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
         services.AddSingleton<ITranslationService, TranslationService>();
         services.AddSingleton<IMailContentProjector, MailContentProjector>();
+        services.AddSingleton<IMailTranslationSettingsStore>(provider => new MailTranslationSettingsStore(
+            provider.GetRequiredService<IConfigurationService>(),
+            provider.GetService<ISecureItemStore>() ?? new Security.ProtectedFileSecureItemStore(
+                System.IO.Path.Combine(provider.GetRequiredService<IApplicationConfiguration>().ApplicationDataFolderPath, "TranslationSecrets"),
+                provider.GetRequiredService<ISecretProtector>())));
+        services.AddSingleton<IMailTranslationService, MailTranslationService>();
         services.AddSingleton<IDatabaseSchemaService, DatabaseSchemaService>();
         services.AddSingleton<IMigrationClock, SystemMigrationClock>();
         services.AddSingleton<IAuthenticationTokenMigrationService, AuthenticationTokenMigrationService>();

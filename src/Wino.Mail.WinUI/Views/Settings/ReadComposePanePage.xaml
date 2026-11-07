@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:abstract="using:Wino.Views.Abstract"
+    xmlns:ai="using:Wino.Core.Domain.Models.Ai"
     xmlns:controls="using:CommunityToolkit.WinUI.Controls"
     xmlns:coreControls="using:Wino.Mail.WinUI.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -13,6 +14,123 @@
     mc:Ignorable="d">
 
     <StackPanel>
+        <controls:SettingsExpander
+            AutomationProperties.AutomationId="MailTranslationSettingsExpander"
+            Description="{x:Bind domain:Translator.MailTranslation_Description, Mode=OneTime}"
+            Header="{x:Bind domain:Translator.MailTranslation_Title, Mode=OneTime}">
+            <controls:SettingsExpander.HeaderIcon>
+                <coreControls:WinoFontIcon Icon="Translate" />
+            </controls:SettingsExpander.HeaderIcon>
+            <controls:SettingsExpander.Items>
+                <controls:SettingsCard Header="{x:Bind domain:Translator.MailTranslation_Provider, Mode=OneTime}">
+                    <ComboBox
+                        AutomationProperties.AutomationId="MailTranslationProvider"
+                        AutomationProperties.Name="{x:Bind domain:Translator.MailTranslation_Provider, Mode=OneTime}"
+                        ItemsSource="{x:Bind ViewModel.MailTranslation.Providers}"
+                        SelectedIndex="{x:Bind ViewModel.MailTranslation.ProviderIndex, Mode=TwoWay}" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="{x:Bind domain:Translator.MailTranslation_TargetLanguage, Mode=OneTime}">
+                    <ComboBox
+                        AutomationProperties.AutomationId="MailTranslationTargetLanguage"
+                        AutomationProperties.Name="{x:Bind domain:Translator.MailTranslation_TargetLanguage, Mode=OneTime}"
+                        ItemsSource="{x:Bind ViewModel.MailTranslation.Languages}"
+                        SelectedItem="{x:Bind ViewModel.MailTranslation.TargetLanguage, Mode=TwoWay}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="ai:AiTranslateLanguageOption">
+                                <TextBlock Text="{x:Bind Label}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="{x:Bind domain:Translator.MailTranslation_SourceLanguage, Mode=OneTime}">
+                    <ComboBox
+                        AutomationProperties.AutomationId="MailTranslationSourceLanguage"
+                        AutomationProperties.Name="{x:Bind domain:Translator.MailTranslation_SourceLanguage, Mode=OneTime}"
+                        ItemsSource="{x:Bind ViewModel.MailTranslation.SourceLanguages}"
+                        SelectedItem="{x:Bind ViewModel.MailTranslation.SourceLanguage, Mode=TwoWay}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="ai:AiTranslateLanguageOption">
+                                <TextBlock Text="{x:Bind Label}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </controls:SettingsCard>
+                <controls:SettingsCard
+                    HorizontalContentAlignment="Stretch"
+                    ContentAlignment="Vertical"
+                    Visibility="{x:Bind ViewModel.MailTranslation.IsOpenAi, Mode=OneWay}">
+                    <StackPanel Spacing="12">
+                        <TextBox
+                            AutomationProperties.AutomationId="MailTranslationOpenAiEndpoint"
+                            Header="{x:Bind domain:Translator.MailTranslation_Endpoint, Mode=OneTime}"
+                            Text="{x:Bind ViewModel.MailTranslation.OpenAiEndpoint, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Text="{x:Bind domain:Translator.MailTranslation_EndpointHint, Mode=OneTime}" TextWrapping="Wrap" />
+                        <TextBox
+                            AutomationProperties.AutomationId="MailTranslationOpenAiModel"
+                            Header="{x:Bind domain:Translator.MailTranslation_Model, Mode=OneTime}"
+                            Text="{x:Bind ViewModel.MailTranslation.OpenAiModel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox
+                            MinHeight="100"
+                            MaxHeight="240"
+                            AcceptsReturn="True"
+                            AutomationProperties.AutomationId="MailTranslationPrompt"
+                            Header="{x:Bind domain:Translator.MailTranslation_Prompt, Mode=OneTime}"
+                            Text="{x:Bind ViewModel.MailTranslation.Prompt, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                            TextWrapping="Wrap" />
+                        <TextBlock Text="{x:Bind domain:Translator.MailTranslation_PromptHint, Mode=OneTime}" TextWrapping="Wrap" />
+                        <Button
+                            AutomationProperties.AutomationId="MailTranslationResetPrompt"
+                            Command="{x:Bind ViewModel.MailTranslation.ResetPromptCommand}"
+                            Content="{x:Bind domain:Translator.MailTranslation_ResetPrompt, Mode=OneTime}" />
+                    </StackPanel>
+                </controls:SettingsCard>
+                <controls:SettingsCard
+                    HorizontalContentAlignment="Stretch"
+                    ContentAlignment="Vertical"
+                    Visibility="{x:Bind ViewModel.MailTranslation.IsPlamo, Mode=OneWay}">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="{x:Bind domain:Translator.MailTranslation_PlamoHint, Mode=OneTime}" TextWrapping="Wrap" />
+                        <TextBox
+                            AutomationProperties.AutomationId="MailTranslationPlamoEndpoint"
+                            Header="{x:Bind domain:Translator.MailTranslation_Endpoint, Mode=OneTime}"
+                            Text="{x:Bind ViewModel.MailTranslation.PlamoEndpoint, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox
+                            AutomationProperties.AutomationId="MailTranslationPlamoModel"
+                            Header="{x:Bind domain:Translator.MailTranslation_Model, Mode=OneTime}"
+                            Text="{x:Bind ViewModel.MailTranslation.PlamoModel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                </controls:SettingsCard>
+                <controls:SettingsCard Description="{x:Bind domain:Translator.MailTranslation_SarashinaLanguages, Mode=OneTime}" Visibility="{x:Bind ViewModel.MailTranslation.IsSarashina, Mode=OneWay}" />
+                <controls:SettingsCard
+                    Description="{x:Bind domain:Translator.MailTranslation_DeepLHint, Mode=OneTime}"
+                    Header="{x:Bind domain:Translator.MailTranslation_DeepLFree, Mode=OneTime}"
+                    Visibility="{x:Bind ViewModel.MailTranslation.IsDeepL, Mode=OneWay}">
+                    <ToggleSwitch
+                        AutomationProperties.AutomationId="MailTranslationDeepLFree"
+                        AutomationProperties.Name="{x:Bind domain:Translator.MailTranslation_DeepLFree, Mode=OneTime}"
+                        IsOn="{x:Bind ViewModel.MailTranslation.DeepLFreeApi, Mode=TwoWay}" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Description="{x:Bind domain:Translator.MailTranslation_KeyHint, Mode=OneTime}" Header="{x:Bind domain:Translator.MailTranslation_ApiKey, Mode=OneTime}">
+                    <PasswordBox
+                        Width="260"
+                        AutomationProperties.AutomationId="MailTranslationApiKey"
+                        AutomationProperties.Name="{x:Bind domain:Translator.MailTranslation_ApiKey, Mode=OneTime}"
+                        Password="{x:Bind ViewModel.MailTranslation.ApiKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                </controls:SettingsCard>
+                <controls:SettingsCard HorizontalContentAlignment="Stretch" ContentAlignment="Vertical">
+                    <StackPanel Spacing="12">
+                        <Button
+                            AutomationProperties.AutomationId="MailTranslationSaveSettings"
+                            Command="{x:Bind ViewModel.MailTranslation.SaveCommand}"
+                            Content="{x:Bind domain:Translator.Buttons_Save, Mode=OneTime}" />
+                        <TextBlock
+                            AutomationProperties.LiveSetting="Polite"
+                            Text="{x:Bind ViewModel.MailTranslation.Status, Mode=OneWay}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </controls:SettingsCard>
+            </controls:SettingsExpander.Items>
+        </controls:SettingsExpander>
         <controls:SettingsExpander
             AutomationProperties.AutomationId="ReadComposePanePageSettingsExpander"
             Description="{x:Bind domain:Translator.SettingsReaderFontFamily_Description}"

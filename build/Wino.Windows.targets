@@ -1,4 +1,14 @@
 <Project>
+  <Target Name="WinoSelectReleaseRuntime" BeforeTargets="ProcessFrameworkReferences"
+          Condition="'$(WinoIsReleaseBuild)' == 'true' and '$(WinoReleaseRuntimeVersion)' != ''">
+    <!-- Scope the override to .NET; a global RuntimeFrameworkVersion also changes the Windows SDK reference pack. -->
+    <ItemGroup>
+      <FrameworkReference Update="Microsoft.NETCore.App" RuntimeFrameworkVersion="$(WinoReleaseRuntimeVersion)" />
+      <KnownILCompilerPack Update="Microsoft.DotNet.ILCompiler"
+                           Condition="'%(KnownILCompilerPack.TargetFramework)' == 'net10.0'"
+                           ILCompilerPackVersion="$(WinoReleaseRuntimeVersion)" />
+    </ItemGroup>
+  </Target>
   <!-- Windows build policy, imported by Directory.Build.targets when WinoTargetPlatform is Windows:
        CsWinRT AOT settings, WinUI head warnings, and MSIX payload handling. -->
 

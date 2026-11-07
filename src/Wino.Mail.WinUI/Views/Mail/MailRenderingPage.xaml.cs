@@ -89,6 +89,7 @@ public sealed partial class MailRenderingPage : MailRenderingPageAbstract,
         _readerSession = new WindowsHtmlMailReaderSession(MailRenderer);
 
         InitializeWinoIntelligenceHeader();
+        ViewModel.MailTranslation.RerenderRequested += RenderTranslatedContentAsync;
 
         WebViewExtensions.EnsureWebView2Environment();
 
@@ -153,6 +154,7 @@ public sealed partial class MailRenderingPage : MailRenderingPageAbstract,
 
         _currentRenderedHtml = htmlBody ?? string.Empty;
         _intelligence.SetRenderedContent(_currentRenderedHtml);
+        ViewModel.MailTranslation.SetContent(_currentRenderedHtml);
 
         try
         {
@@ -178,9 +180,18 @@ public sealed partial class MailRenderingPage : MailRenderingPageAbstract,
 
     private bool IsStaleRender(int renderVersion) => renderVersion != Volatile.Read(ref _renderVersion);
 
+    private async Task RenderTranslatedContentAsync()
+    {
+        _intelligence.CancelTranslation();
+        _intelligence.IsShowingTranslation = false;
+        _intelligence.IsTranslationApplied = false;
+        await RenderActiveContentAsync();
+        await UpdateAccessibleMailContextAsync();
+    }
+
     private async Task RenderActiveContentAsync()
     {
-        var html = _intelligence.ResolveActiveHtml(_currentRenderedHtml);
+        var html = ViewModel.MailTranslation.ResolveHtml(_intelligence.ResolveActiveHtml(_currentRenderedHtml));
         var renderMode = IsReaderViewEnabled
             ? HtmlMailRenderMode.Readability
             : HtmlMailRenderMode.Original;
@@ -207,7 +218,7 @@ public sealed partial class MailRenderingPage : MailRenderingPageAbstract,
                 ? ViewModel.FromName
                 : $"{ViewModel.FromName} <{ViewModel.FromAddress}>";
         var creationDate = XamlHelpers.GetCreationDateString(ViewModel.CreationDate, _preferencesService.MailTimeFormatPreference);
-        var accessibleText = ViewModel.CurrentRenderModel?.AccessibleText ?? string.Empty;
+        var accessibleText = ViewModel.MailTranslation.ResolveAccessibleText(ViewModel.CurrentRenderModel?.AccessibleText ?? string.Empty);
 
         await _readerSession.SetAccessibilityContextAsync(new ReaderAccessibilityContext(
             subject,
@@ -297,6 +308,7 @@ public sealed partial class MailRenderingPage : MailRenderingPageAbstract,
     {
         _currentRenderedHtml = string.Empty;
         _intelligence.ResetContent();
+        ViewModel.MailTranslation.SetContent(string.Empty);
     }
 
     public async Task PrepareForIdleAsync()
@@ -334,6 +346,8 @@ public sealed partial class MailRenderingPage : MailRenderingPageAbstract,
         ViewModel.PrintPresenter = null;
         ViewModel.RenderHtmlAsyncFunc = null;
         ViewModel.ClearRenderedHtmlAsyncFunc = null;
+        ViewModel.MailTranslation.SetContent(string.Empty);
+        ViewModel.MailTranslation.RerenderRequested -= RenderTranslatedContentAsync;
         _intelligence.ClearContext();
         _intelligence.ForgetMailItem();
         _currentMailItem = null;
@@ -679,6 +693,7 @@ public sealed partial class MailRenderingPage : MailRenderingPageAbstract,
         switch (e.Action)
         {
             case WinoIntelligenceAction.Translate:
+                ViewModel.MailTranslation.SetContent(_currentRenderedHtml);
                 // The header owns the language pickers.
                 _intelligence.SelectedSourceLanguage = IntelligenceHeader.SelectedSourceLanguage;
                 _intelligence.SelectedTargetLanguage = IntelligenceHeader.SelectedTargetLanguage;

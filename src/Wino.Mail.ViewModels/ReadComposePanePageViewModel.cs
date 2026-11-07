@@ -22,6 +22,7 @@ public partial class ReadComposePanePageViewModel : MailBaseViewModel
     public IPreferencesService PreferencesService { get; set; }
     public List<string> AvailableFonts => FontService.GetFonts();
     public List<AppLanguageModel> AvailableSpellCheckLanguages { get; }
+    public MailTranslationSettingsViewModel MailTranslation { get; }
 
     [ObservableProperty]
     [NotifyPropertyChangedRecipients]
@@ -62,9 +63,11 @@ public partial class ReadComposePanePageViewModel : MailBaseViewModel
 
     public ReadComposePanePageViewModel(IMailDialogService dialogService,
                                     IPreferencesService preferencesService,
-                                    ITranslationService translationService)
+                                    ITranslationService translationService,
+                                    IMailTranslationSettingsStore mailTranslationSettingsStore)
     {
         PreferencesService = preferencesService;
+        MailTranslation = new MailTranslationSettingsViewModel(mailTranslationSettingsStore);
         AvailableSpellCheckLanguages = translationService.GetAvailableLanguages();
 
         CurrentReaderFont = preferencesService.ReaderFont;
