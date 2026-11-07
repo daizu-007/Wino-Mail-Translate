@@ -75,7 +75,7 @@ pwsh -NoProfile -File .\scripts\release\windows\build-releases.ps1 -NonInteracti
 
 ## Beta artwork and runtime profiles
 
-The source `release-profile.json` describes Store stable. `scripts/release/windows/profiles` contains the two sideload profiles.
+The source `release-profile.json` describes Store stable. `scripts/release/windows/profiles` contains the official Beta and Sideload profiles and the profile used by the [fork's GitHub Actions release](windows-fork-release-ja.md).
 The packager checks profile identity, notification IDs, and the session-start task's COM class ID (`StartupTaskActivatorId`) against the generated manifest.
 The app reads its profile before activation. Mutex and event names use the installed package family name, without the version.
 

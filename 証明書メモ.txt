@@ -1,0 +1,3 @@
+Subject    : CN=Daizu007.WinoMailTranslate
+Thumbprint : AF81680204D210D836843DCC17D3862199EDB61C
+NotAfter   : 2029/11/07 15:53:42

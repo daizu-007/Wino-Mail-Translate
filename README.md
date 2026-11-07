@@ -1,85 +1,56 @@
-<p align="center">
-  <a href="https://apps.microsoft.com/detail/Wino%20Mail/9NCRCVJC50WL?launch=true&mode=full">
-    <img src="https://www.winomail.app/logo.png" width="90" height="90" alt="Wino Mail logo">
-  </a>
-</p>
+# Wino Mail Translate
+カスタマイズ可能な翻訳機能を搭載した[Wino Mail](https://www.winomail.app/)の非公式フォーク
 
-<h1 align="center">Wino Mail</h1>
+## 概要
+[Wino Mail](https://www.winomail.app/)は美しいデザインと使いやすさを兼ね備えたオープンソースのメールクライアントです。  
+このフォークでは、[Wino Mailに公式搭載されているクラウド翻訳機能](https://www.winomail.app/intelligence)から独立したカスタマイズ性の高い翻訳機能を追加しています。
 
-<p align="center">A native Mail, Calendar, People, and To Do client for Windows.</p>
+Windows以外のOSでの使用は想定していません。
 
-<p align="center">
-  <a href="https://apps.microsoft.com/detail/Wino%20Mail/9NCRCVJC50WL?launch=true&mode=full">Microsoft Store</a>
-  · <a href="https://github.com/bkaankose/Wino-Mail/releases">Release notes</a>
-  · <a href="CONTRIBUTING.md">Contributing</a>
-  · <a href="README-JP.md">Windowsローカルビルド（日本語）</a>
-</p>
+## 翻訳
+翻訳方式は以下の4つから選択できます。
 
-![Wino Mail screenshot](https://user-images.githubusercontent.com/12009960/232114528-2d2c8e3c-dbe7-429a-94e0-6aecc73bdf70.png)
+### 1. PLaMo 3 Translate
+ローカルのLMStudioで動作するPLaMo 3 Translateを用いた翻訳方式です。外部にメール本文を送信することなく、プライベートに翻訳できます。  
+このフォークを作成した最大の理由であり、プライバシーを保護しつつ自然な日本語に翻訳できます。
 
-## Motivation
+### 2. LLM翻訳
+OpenAI APIと互換性のある任意のプロバイダのAPIを用いてLLMで翻訳を行います。
+OllamaやLMStudioを用いたローカル翻訳も可能です。
 
-I'm a big fan of Windows Mail & Calendars due to its simplicity. Personally, I find it more intuitive for daily use cases compared to Outlook desktop and the new WebView2 powered Outlook version. Seeing [Microsoft deprecating it](https://support.microsoft.com/en-us/office/outlook-for-windows-the-future-of-mail-calendar-and-people-on-windows-11-715fc27c-e0f4-4652-9174-47faa751b199#:~:text=The%20Mail%20and%20Calendar%20applications,will%20no%20longer%20be%20supported.) dragged me into starting to work on Wino a couple of years ago. Wino's main motivation is to bring all the existing functionality from Mail & Calendars over time without changing the user experience that millions have loved since the Windows 8 days in Mail & Calendars.
+### 3. Sarashina 3.2 Translate
+Sarashinaの翻訳APIを用いた翻訳方式です。外部にデータ送信され、モデルの学習に利用されますが、PCスペックを問わず無料で高速に自然な日本語への翻訳を実現できます。
 
-Wino started before the current AI era. The project welcomes AI-assisted contributions when they comply with its coding rules, architecture, and maintainer decisions.
+### 4. DeepL翻訳
+定番の翻訳サービス、DeepLの公式APIを用います。動作確認はしていません。
 
-## Download
+## アカウント数制限
+無料版Wino Mailはアカウント数が3つまでに制限されています。フォークではMicrosoft Storeでのアドオン購入を利用できないと考えられるため、アカウント数制限は削除されています。Wino Mailはコード改変によるアカウント数制限解除を禁止していませんが、このフォークの種目的ではないためアカウント数の制限解除が目的であれば公式アドオンの購入をおすすめします。
 
-Install Wino Mail from the Microsoft Store or directly with App Installer.
+> If you are comfortable building software, you can build Wino from source and change the account limit. Buying an add-on is a way to support the project, not a requirement to use its source code.
 
-| Distribution | Recommended for | Installation |
-| --- | --- | --- |
-| Microsoft Store | Most users | [Install Wino Mail from Microsoft Store](https://apps.microsoft.com/detail/Wino%20Mail/9NCRCVJC50WL?launch=true&mode=full) |
-| Direct download | Users who prefer to install outside Microsoft Store | [Install Wino Mail with App Installer](https://download.winomail.app/WinoMail.appinstaller) |
+https://www.winomail.app/pricing
 
-<a href="https://apps.microsoft.com/detail/Wino%20Mail/9NCRCVJC50WL?launch=true&mode=full">
-  <img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200" alt="Get Wino Mail from Microsoft Store">
-</a>
+## 寄付
+Wino Mail Translateはあまり労力を書けずに作られた概念実証的側面を持つ小規模なフォークです。継続的なメンテナンスを行うつもりもありません。もし少しでもこのプロジェクトを気に入ったかたは、フォーク元である[Wino Mail](https://www.winomail.app/)のアドオン購入を検討してみてください。
 
-### Release notes
+https://www.winomail.app/pricing
 
-[GitHub Releases](https://github.com/bkaankose/Wino-Mail/releases) lists every stable version available in Microsoft Store, with its full list of changes and fixed issues.
+Wino Mailには2つのアドオンがあります。
+1. 一度きりの支払いで永久に利用できる、アカウント数制限を解除する「Unlimited Accounts」
+2. 月額課金で翻訳機能だけでなく、メールの分類や書き換え、ブリーフィングなどのAI機能を利用できる「Wino Intelligence」
 
-### Beta
+いずれもMicrosoft Storeから購入できます。  
+  
+  
+  
+また、Wino Mailの開発者である[Burak Kaan Köse](https://github.com/bkaankose)氏のGitHub Sponsorsでスポンサーになることもできます。
 
-The beta channel gets new changes before they reach Microsoft Store. Beta builds can contain unfinished changes and are for testing. Install the beta with [App Installer](https://download.winomail.app/WinoMailBetaIsolated.appinstaller); it installs next to the Store version.
+https://github.com/sponsors/bkaankose
 
-## Platforms
+## AI Policy
+このフォークの変更は、このREADMEを除きほぼすべて生成AIによってVibe Codeで行われました。いかなる問題が生じても一切の責任を負いませんし、サポートも行えません。ただし、CodexのGPT-6.1 Solはフォーク主であるdaizu-007よりも優秀なコーディング能力を持っています。
 
-| Platform | Application | Developer guide |
-| --- | --- | --- |
-| Windows | WinUI 3 | [Windows development](docs/harness/development-windows.md) |
-| macOS | AppKit | [macOS development](docs/harness/development-macos.md) |
-| iOS and iPadOS | UIKit | [iOS development](docs/harness/development-ios.md) |
-| Android | Android Views and Material Components (in development) | [Android development](docs/harness/development-android.md) |
-
-All applications share the .NET backend, ViewModels, and translations. The download links above are for Windows.
-
-## Other features
-
-- Native WinUI 3 interface with light, dark, and high-contrast support
-- Outlook, Gmail, IMAP, POP3, CalDAV, CardDAV, and local data support
-- Linked and merged accounts
-- Offline workflows and local search
-- Background synchronization and toast notifications
-- WebView2-based mail reading and composition
-- [Message translation](docs/mail-translation.md) with OpenAI-compatible APIs, local PLaMo 3 Translate, Sarashina, and DeepL (Windows)
-- EML and ICS file integration
-- `mailto`, `webcal`, `webcals`, and Wino protocol activation
-
-## Contributing
-
-Read the [contribution guide](CONTRIBUTING.md) for developer setup, build commands, and contribution rules. Discuss large features in an issue or proposal first.
-
-Contributors remain responsible for every submitted change, including AI-assisted changes.
-
-## Donate
-
-Donations help to fund the project website and development costs.
-
-- [Donate with PayPal](https://www.paypal.com/donate/?hosted_button_id=LGPERGGXFMQ7U)
-- Buy the Unlimited Accounts add-on in Wino. It is a one-time purchase.
-
-## License
-
-See [`LICENSE.md`](LICENSE.md).
+## クレジット
+このプロジェクトは、GPL-3.0に基づく[Wino Mail](https://github.com/bkaankose/Wino-Mail)の非公式フォークです。  
+オリジナル版を開発した[Burak Kaan Köse](https://github.com/bkaankose)氏をはじめ、[Wino Mail](https://www.winomail.app/)の開発に携わったすべての方々に感謝します。

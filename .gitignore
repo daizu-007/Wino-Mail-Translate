@@ -416,7 +416,7 @@ docs/design-prototypes/*
 !/docs/design-prototypes/wino-design-guideline.html
 /docs/blog
 /docs/*
-# Track only the platform guides below; other local documents under docs stay ignored.
+# Track the guides below; other local documents under docs stay ignored.
 !/docs/harness/
 /docs/harness/*
 !/docs/harness/development-windows.md
@@ -424,6 +424,7 @@ docs/design-prototypes/*
 !/docs/harness/development-ios.md
 !/docs/harness/development-android.md
 !/docs/releases-windows.md
+!/docs/windows-fork-release-ja.md
 !/docs/releases-macos.md
 !/docs/releases-android.md
 !/docs/macos-design-decisions.md

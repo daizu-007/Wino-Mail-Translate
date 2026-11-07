@@ -42,7 +42,8 @@ try {
 }
 finally { $archive.Dispose() }
 $identity = $manifest.Bundle.Identity
-if ([string]$identity.Name -cne '58272BurakKSE.WinoMailPreview' -or [string]$identity.Publisher -cne $certificate.Subject) {
+if ([string]$identity.Name -cnotin @('58272BurakKSE.WinoMailPreview', 'Daizu007.WinoMailTranslate') -or
+    [string]$identity.Publisher -cne $certificate.Subject) {
     throw 'The bundle identity or publisher does not match the personal Wino package.'
 }
 $installed = @(Get-AppxPackage -Name ([string]$identity.Name))
@@ -81,5 +82,12 @@ $signature = Get-AuthenticodeSignature -LiteralPath $BundlePath
 if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ne $ExpectedThumbprint) {
     throw "Signature validation failed after trust import: $($signature.Status)"
 }
-Add-AppxPackage -Path $BundlePath
-Write-Host 'Installed. Open Wino Mail from the Start menu.'
+$install = @{ Path = $BundlePath }
+$dependencyRoot = Join-Path (Split-Path $BundlePath -Parent) 'Dependencies'
+if (Test-Path -LiteralPath $dependencyRoot -PathType Container) {
+    $dependencies = @(Get-ChildItem -LiteralPath $dependencyRoot -Recurse -File |
+        Where-Object { $_.Extension -in '.appx', '.msix', '.appxbundle', '.msixbundle' })
+    if ($dependencies.Count -gt 0) { $install.DependencyPath = $dependencies.FullName }
+}
+Add-AppxPackage @install
+Write-Host 'Installed. Open the app from the Start menu.'

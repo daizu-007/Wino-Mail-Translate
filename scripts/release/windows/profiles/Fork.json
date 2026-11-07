@@ -1,0 +1,19 @@
+{
+  "Distribution": "Fork",
+  "PackageName": "Daizu007.WinoMailTranslate",
+  "Publisher": "CN=Daizu007.WinoMailTranslate",
+  "DisplayNames": {
+    "Mail": "Wino Mail Translate",
+    "Calendar": "Wino Calendar Translate",
+    "People": "Wino People Translate",
+    "Tasks": "Wino To Do Translate"
+  },
+  "NotificationActivatorIds": {
+    "Mail": "1ce21593-e6bc-4a15-853d-f8b16d6bc72a",
+    "Calendar": "dceccb8e-6d2f-435f-8742-1fd245e23d9a",
+    "People": "54897ef9-d670-4af5-9ace-7a827ca8c1f9",
+    "Tasks": "0faee103-0ad6-444c-a45e-e541005be3f4"
+  },
+  "StartupTaskActivatorId": "76f845a5-0efe-4f98-960b-8626852b191a",
+  "WidgetProviderId": "1f7bd27e-4abc-4824-8d85-6f7bb2466d2b"
+}

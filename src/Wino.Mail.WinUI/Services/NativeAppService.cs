@@ -191,6 +191,7 @@ public partial class NativeAppService : INativeAppService, IAppMetadataService, 
     {
         "Sideload" => WindowsAppDistribution.Sideload,
         "Beta" => WindowsAppDistribution.Beta,
+        "Fork" => WindowsAppDistribution.Fork,
         _ => WindowsAppDistribution.Store
     };
 

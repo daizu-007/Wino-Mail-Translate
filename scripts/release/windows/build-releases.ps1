@@ -1,11 +1,11 @@
 #requires -Version 7.0
 <#
 .SYNOPSIS
-Builds Store, Beta, and stable sideload packages from one Release compilation.
+Builds Store, Beta, stable sideload, or self-signed fork packages.
 .DESCRIPTION
 Asks whether to translate missing resources, then for channels and architectures.
 Reads the source manifest version. Outputs verified packages under
-<OutputRoot>\<version>\<Store|Beta|Sideload>, with the shared PDB files in
+<OutputRoot>\<version>\<Store|Beta|Sideload|Fork>, with the shared PDB files in
 <OutputRoot>\<version>\Symbols. See docs/releases-windows.md.
 .PARAMETER Translate
 Run scripts/localization/translate_resources.py --apply before building, without asking.
@@ -22,6 +22,9 @@ param(
     [switch]$Store,
     [switch]$Beta,
     [switch]$Sideload,
+    [switch]$Fork,
+    [ValidateRange(1, 65535)][int]$ForkRevision,
+    [ValidatePattern('^[0-9A-Fa-f]{40}$')][string]$ForkCertificateThumbprint,
     [ValidateSet('x86', 'x64', 'ARM64')][string[]]$Architectures = @('x64'),
     [string]$BetaAssetsPath,
     [string]$StoreTestCertificateThumbprint,
@@ -60,7 +63,7 @@ function Read-ReleaseSelection {
         '1' = @('x64'); 'x64' = @('x64'); 'x64 only' = @('x64')
         '2' = @('x86', 'x64', 'ARM64'); 'all' = @('x86', 'x64', 'ARM64')
     }
-    return [pscustomobject]@{ Store = $store; Beta = $beta; Sideload = $sideload; Architectures = @($architectures) }
+    return [pscustomobject]@{ Store = $store; Beta = $beta; Sideload = $sideload; Fork = $false; Architectures = @($architectures) }
 }
 
 function Get-ReleaseVersion {
@@ -108,20 +111,22 @@ function New-ReleasePlan {
     $project = Join-Path $RepositoryRoot 'src/Wino.Mail.WinUI/Wino.Mail.WinUI.csproj'
     $manifestPath = Join-Path (Split-Path $project) 'Package.appxmanifest'
     $manifest = [xml](Get-Content -LiteralPath $manifestPath -Raw)
-    $version = Get-ReleaseVersion ([string]$manifest.Package.Identity.Version)
+    $sourceVersion = Get-ReleaseVersion ([string]$manifest.Package.Identity.Version)
+    $version = if ($Selection.Fork) { "$(([version]$sourceVersion).ToString(3)).$ForkRevision" } else { $sourceVersion }
     $outputRoot = $script:ReleaseOutputRoot
     $versionRoot = Resolve-ReleaseChildPath $outputRoot $version
     # FolderName names the bundle and its versioned directory on the download site, independent of the local layout.
     $sideloadChannels = @()
     if ($Selection.Beta) { $sideloadChannels += [pscustomobject]@{ Name = 'Beta'; FolderName = "WinoMail_Beta_$version" } }
     if ($Selection.Sideload) { $sideloadChannels += [pscustomobject]@{ Name = 'Sideload'; FolderName = "WinoMail_SideloadRelease_$(([version]$version).ToString(3))" } }
+    if ($Selection.Fork) { $sideloadChannels += [pscustomobject]@{ Name = 'Fork'; FolderName = "WinoMailTranslate_${version}_x64" } }
     $destinations = @()
     if ($Selection.Store) { $destinations += Join-Path $versionRoot 'Store' }
     foreach ($channel in $sideloadChannels) { $destinations += Join-Path $versionRoot $channel.Name }
     Assert-ReleaseDestinations $destinations
 
     return [pscustomobject]@{
-        Selection = $Selection; Version = $version; Project = $project
+        Selection = $Selection; Version = $version; SourceVersion = $sourceVersion; Project = $project
         RepositoryRoot = $RepositoryRoot; ManifestPath = $manifestPath
         ManifestHash = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash
         StoreName = [string]$manifest.Package.Identity.Name
@@ -149,8 +154,7 @@ function Get-ReleaseTools {
     if (-not (Test-Path -LiteralPath $msbuild)) { throw 'The x64 MSBuild executable is missing.' }
 
     $sdkRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits/10/bin'
-    $required = @('makeappx.exe', 'makepri.exe')
-    if ($Selection.Store -or $Selection.Beta -or $Selection.Sideload) { $required += 'signtool.exe' }
+    $required = @('makeappx.exe', 'makepri.exe', 'signtool.exe')
     $sdk = Get-ChildItem -LiteralPath $sdkRoot -Directory | Where-Object { $_.Name -match '^10\.0\.\d+\.\d+$' } |
         Sort-Object { [version]$_.Name } -Descending | Where-Object {
             $directory = $_.FullName
@@ -161,46 +165,42 @@ function Get-ReleaseTools {
         # Use the repository-pinned SDK's MSBuild. VS 2022's SDK resolver cannot load .NET 10.
         MSBuild = $dotnet; MakeAppx = Join-Path $sdk.FullName 'x64/makeappx.exe'
         MakePri = Join-Path $sdk.FullName 'x64/makepri.exe'
-        SignTool = if ($Selection.Store -or $Selection.Beta -or $Selection.Sideload) { Join-Path $sdk.FullName 'x64/signtool.exe' } else { $null }
+        SignTool = Join-Path $sdk.FullName 'x64/signtool.exe'
     }
 }
 
-function Get-StoreSigningCertificate {
-    param([object]$Plan, [string]$Thumbprint)
-
-    if ([string]::IsNullOrWhiteSpace($Thumbprint)) {
-        $Thumbprint = [Environment]::GetEnvironmentVariable('WINO_STORE_TEST_CERTIFICATE_THUMBPRINT')
-    }
+function Get-LocalSigningCertificate {
+    param([string]$Publisher, [string]$Thumbprint)
 
     $now = Get-Date
     if (-not [string]::IsNullOrWhiteSpace($Thumbprint)) {
         $normalized = $Thumbprint.Replace(' ', '').ToUpperInvariant()
         if ($normalized -notmatch '^[0-9A-F]{40}$') {
-            throw 'The Store test certificate thumbprint must contain exactly 40 hexadecimal characters.'
+            throw 'The signing certificate thumbprint must contain exactly 40 hexadecimal characters.'
         }
         $certificates = @(Get-Item -LiteralPath "Cert:\CurrentUser\My\$normalized" -ErrorAction SilentlyContinue)
     }
     else {
         $certificates = @(Get-ChildItem Cert:\CurrentUser\My | Where-Object {
-            $_.Subject -ceq $Plan.StorePublisher -and $_.HasPrivateKey -and
+            $_.Subject -ceq $Publisher -and $_.HasPrivateKey -and
             $_.NotBefore -le $now -and $_.NotAfter -gt $now -and
             @($_.EnhancedKeyUsageList | Where-Object { $_.ObjectId -eq '1.3.6.1.5.5.7.3.3' }).Count -gt 0
         } | Sort-Object NotBefore -Descending)
     }
 
     if ($certificates.Count -eq 0) {
-        throw "No Store test signing certificate was found in Cert:\CurrentUser\My for publisher '$($Plan.StorePublisher)'. Create or import one, or set WINO_STORE_TEST_CERTIFICATE_THUMBPRINT."
+        throw "No signing certificate was found in Cert:\CurrentUser\My for publisher '$Publisher'."
     }
 
     $certificate = $certificates[0]
-    if ($certificate.Subject -cne $Plan.StorePublisher) { throw 'The Store test certificate subject does not match the Store manifest publisher.' }
-    if (-not $certificate.HasPrivateKey) { throw 'The Store test certificate does not have an accessible private key.' }
-    if ($certificate.NotBefore -gt $now -or $certificate.NotAfter -le $now) { throw 'The Store test certificate is not currently valid.' }
+    if ($certificate.Subject -cne $Publisher) { throw 'The signing certificate subject does not match the manifest publisher.' }
+    if (-not $certificate.HasPrivateKey) { throw 'The signing certificate does not have an accessible private key.' }
+    if ($certificate.NotBefore -gt $now -or $certificate.NotAfter -le $now) { throw 'The signing certificate is not currently valid.' }
     if (@($certificate.EnhancedKeyUsageList | Where-Object { $_.ObjectId -eq '1.3.6.1.5.5.7.3.3' }).Count -eq 0) {
-        throw 'The Store test certificate is not valid for code signing.'
+        throw 'The certificate is not valid for code signing.'
     }
 
-    Write-Host "Store test signing certificate: $($certificate.Thumbprint) (expires $($certificate.NotAfter.ToString('u')))"
+    Write-Host "Signing certificate: $($certificate.Thumbprint) (expires $($certificate.NotAfter.ToString('u')))"
     return $certificate
 }
 
@@ -420,7 +420,7 @@ function Get-PriCandidates {
 }
 
 function Get-ReleaseProfile {
-    param([object]$Plan, [ValidateSet('Store', 'Beta', 'Sideload')][string]$Channel)
+    param([object]$Plan, [ValidateSet('Store', 'Beta', 'Sideload', 'Fork')][string]$Channel)
 
     $path = if ($Channel -eq 'Store') { Join-Path $script:ReleaseRepositoryRoot 'src/Wino.Mail.WinUI/release-profile.json' }
         else { Join-Path $PSScriptRoot "profiles/$Channel.json" }
@@ -456,6 +456,7 @@ function Set-ReleaseLayoutProfile {
 
     $Profile | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Layout 'release-profile.json') -Encoding utf8
     $Manifest.Package.Properties.DisplayName = $Profile.DisplayNames.Mail
+    if ($Profile.Distribution -eq 'Fork') { $Manifest.Package.Properties.PublisherDisplayName = 'daizu-007' }
     $entries = @{ App = 'Mail'; CalendarApp = 'Calendar'; ContactsApp = 'People'; ToDoApp = 'Tasks' }
     foreach ($app in $Manifest.Package.Applications.Application) {
         $mode = $entries[[string]$app.Id]
@@ -521,10 +522,11 @@ function New-SideloadPackage {
     Get-ChildItem -LiteralPath $source | Copy-Item -Destination $layout -Recurse
     $manifestPath = Join-Path $layout 'AppxManifest.xml'
     $manifest = [xml](Get-Content -LiteralPath $manifestPath -Raw)
-    Assert-ReleaseIdentity $manifest.Package.Identity $Plan.StoreName $Plan.StorePublisher $Plan.Version
+    Assert-ReleaseIdentity $manifest.Package.Identity $Plan.StoreName $Plan.StorePublisher $Plan.SourceVersion
     if ([string]$manifest.Package.Identity.ProcessorArchitecture -ine $Architecture) { throw 'The exported package architecture is incorrect.' }
     $manifest.Package.Identity.Name = $profile.PackageName
     $manifest.Package.Identity.Publisher = $profile.Publisher
+    $manifest.Package.Identity.Version = $Plan.Version
     Set-ReleaseLayoutProfile $layout $manifest $profile $Plan
     $manifest.Save($manifestPath)
 
@@ -656,18 +658,18 @@ function Assert-PackagedReleaseProfile {
     }
 }
 
-function Sign-StoreReleaseBundle {
+function Sign-LocalReleaseBundle {
     param([string]$Bundle, [string]$CertificatePath, [object]$Certificate, [object]$Tools, [string]$LogPath)
 
     Invoke-ReleaseTool $Tools.SignTool @('sign', '/fd', 'SHA256', '/sha1', $Certificate.Thumbprint, $Bundle) $LogPath
     $signature = Get-AuthenticodeSignature -LiteralPath $Bundle
     if ($null -eq $signature.SignerCertificate -or $signature.SignerCertificate.Thumbprint -cne $Certificate.Thumbprint) {
-        throw 'The locally installable Store bundle signature does not match the selected certificate.'
+        throw 'The locally signed bundle signature does not match the selected certificate.'
     }
 
     $exported = Export-Certificate -Cert $Certificate -FilePath $CertificatePath -Type CERT -Force
     if ($null -eq $exported -or -not (Test-Path -LiteralPath $CertificatePath -PathType Leaf)) {
-        throw 'The Store test signing certificate could not be exported.'
+        throw 'The public signing certificate could not be exported.'
     }
 }
 
@@ -692,7 +694,7 @@ function Get-StoreReleaseArtifact {
     $installableBundle = Join-Path $folder "WinoMail_Store_$($Plan.Version).msixbundle"
     $certificatePath = Join-Path $folder 'WinoMail_Store_TestCertificate.cer'
     Copy-Item -LiteralPath $bundlePath -Destination $installableBundle
-    Sign-StoreReleaseBundle $installableBundle $certificatePath $StoreCertificate $Tools (Join-Path $Staging 'logs/sign-store-test.log')
+    Sign-LocalReleaseBundle $installableBundle $certificatePath $StoreCertificate $Tools (Join-Path $Staging 'logs/sign-store-test.log')
     return $hashes
 }
 
@@ -930,7 +932,7 @@ function Remove-ReleaseStaging {
 }
 
 function Invoke-ReleaseBuild {
-    param([object]$Plan, [object]$Tools, [object]$Signing, [object]$StoreCertificate)
+    param([object]$Plan, [object]$Tools, [object]$Signing, [object]$LocalCertificate)
 
     $null = New-Item -ItemType Directory -Path $Plan.OutputRoot -Force
     $lock = $null
@@ -950,7 +952,7 @@ function Invoke-ReleaseBuild {
         $storeHashes = $null
         if ($Plan.Selection.Store) {
             $stage = 'Store verification and local test signing'
-            $storeHashes = Get-StoreReleaseArtifact $Plan $staging $Tools $StoreCertificate
+            $storeHashes = Get-StoreReleaseArtifact $Plan $staging $Tools $LocalCertificate
         }
         foreach ($channel in $Plan.SideloadChannels) {
             $profile = Get-ReleaseProfile $Plan $channel.Name
@@ -969,16 +971,23 @@ function Invoke-ReleaseBuild {
                 }
             }
             else { $storeHashes = $hashes }
-            $stage = 'Azure signing'
-            Sign-SideloadRelease $bundle $Plan $Tools $Signing $channelStage $channel.Name
-            $signedHash = (Get-FileHash -LiteralPath $bundle -Algorithm SHA256).Hash
             $folder = Join-Path $staging "ready/$($channel.Name)"
             $null = New-Item -ItemType Directory -Path $folder -Force
+            if ($channel.Name -eq 'Fork') {
+                $stage = 'Fork self-signing'
+                Sign-LocalReleaseBundle $bundle (Join-Path $folder 'WinoMailTranslate.cer') $LocalCertificate $Tools (Join-Path $channelStage 'logs/sign.log')
+                Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install-local.ps1') -Destination $folder
+            }
+            else {
+                $stage = 'Azure signing'
+                Sign-SideloadRelease $bundle $Plan $Tools $Signing $channelStage $channel.Name
+            }
+            $signedHash = (Get-FileHash -LiteralPath $bundle -Algorithm SHA256).Hash
             $channelBundle = Join-Path $folder "$($channel.FolderName).msixbundle"
             Copy-Item -LiteralPath $bundle -Destination $channelBundle
             if ((Get-FileHash -LiteralPath $channelBundle -Algorithm SHA256).Hash -cne $signedHash) { throw 'The final bundle differs from its verified signed package.' }
             Copy-ReleaseDependencies (Join-Path $staging 'sdk') (Join-Path $folder 'Dependencies')
-            New-SideloadAppInstaller $channelBundle $Plan $Signing.Distributions[$channel.Name] $channel.Name
+            if ($channel.Name -ne 'Fork') { New-SideloadAppInstaller $channelBundle $Plan $Signing.Distributions[$channel.Name] $channel.Name }
         }
         $stage = 'finalize outputs'
         if ((Get-FileHash -LiteralPath $Plan.ManifestPath -Algorithm SHA256).Hash -cne $Plan.ManifestHash) {
@@ -1036,10 +1045,14 @@ function Invoke-ReleaseTranslation {
 }
 
 function Invoke-InteractiveRelease {
-    if ($NonInteractive -and -not $Store -and -not $Beta -and -not $Sideload) { throw 'Select at least one distribution.' }
+    if ($Fork -and (-not $NonInteractive -or $Store -or $Beta -or $Sideload -or $Architectures.Count -ne 1 -or
+        $Architectures[0] -ne 'x64' -or -not $ForkRevision -or -not $ForkCertificateThumbprint)) {
+        throw 'Use -NonInteractive -Fork with x64, -ForkRevision and -ForkCertificateThumbprint.'
+    }
+    if ($NonInteractive -and -not $Store -and -not $Beta -and -not $Sideload -and -not $Fork) { throw 'Select at least one distribution.' }
     Invoke-ReleaseTranslation
     $selection = if ($NonInteractive) {
-        [pscustomobject]@{ Store = [bool]$Store; Beta = [bool]$Beta; Sideload = [bool]$Sideload; Architectures = $Architectures }
+        [pscustomobject]@{ Store = [bool]$Store; Beta = [bool]$Beta; Sideload = [bool]$Sideload; Fork = [bool]$Fork; Architectures = $Architectures }
     } else { Read-ReleaseSelection }
     if ($null -eq $selection) { Write-Host 'No channels selected. Nothing to build.'; return }
     $plan = New-ReleasePlan $selection
@@ -1047,12 +1060,17 @@ function Invoke-InteractiveRelease {
     if ($selection.Beta -and -not (Test-Path -LiteralPath (Join-Path $plan.BetaAssetsPath 'Assets/Wino_Icon.ico') -PathType Leaf)) {
         throw "Supply beta artwork under $($plan.BetaAssetsPath) before building. See scripts/release/Assets/Beta/README.md."
     }
-    Write-Host "Version: $($plan.Version) | Store: $($selection.Store) | Beta: $($selection.Beta) | Stable sideload: $($selection.Sideload) | Architectures: $($selection.Architectures -join ', ')"
+    Write-Host "Version: $($plan.Version) | Store: $($selection.Store) | Beta: $($selection.Beta) | Stable sideload: $($selection.Sideload) | Fork: $($selection.Fork) | Architectures: $($selection.Architectures -join ', ')"
     $plan.Destinations | ForEach-Object { Write-Host "Output: $_" }
     $tools = Get-ReleaseTools $selection
-    $storeCertificate = if ($selection.Store) { Get-StoreSigningCertificate $plan $StoreTestCertificateThumbprint } else { $null }
+    $localCertificate = if ($selection.Store) {
+        $thumbprint = if ([string]::IsNullOrWhiteSpace($StoreTestCertificateThumbprint)) { $env:WINO_STORE_TEST_CERTIFICATE_THUMBPRINT }
+            else { $StoreTestCertificateThumbprint }
+        Get-LocalSigningCertificate $plan.StorePublisher $thumbprint
+    }
+    elseif ($selection.Fork) { Get-LocalSigningCertificate (Get-ReleaseProfile $plan 'Fork').Publisher $ForkCertificateThumbprint }
     $signing = if ($selection.Beta -or $selection.Sideload) { Get-ReleaseSigningConfiguration -IncludeBeta:$selection.Beta -IncludeSideload:$selection.Sideload } else { $null }
-    $symbolsPath = Invoke-ReleaseBuild $plan $tools $signing $storeCertificate
+    $symbolsPath = Invoke-ReleaseBuild $plan $tools $signing $localCertificate
     if (-not $NonInteractive -and -not [string]::IsNullOrWhiteSpace([string]$symbolsPath)) {
         $upload = Read-ReleaseChoice "Upload symbols for $($plan.Version) now? (yes/no)" @{ yes = $true; y = $true; no = $false; n = $false }
         if ($upload) {

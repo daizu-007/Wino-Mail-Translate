@@ -1,0 +1,105 @@
+name: Windows fork release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: github.repository == 'daizu-007/Wino-Mail-Translate' && github.ref == 'refs/heads/main'
+    runs-on: windows-2025
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Import signing certificate
+        id: signing
+        env:
+          MSIX_SIGNING_PFX_BASE64: ${{ secrets.MSIX_SIGNING_PFX_BASE64 }}
+          MSIX_SIGNING_PFX_PASSWORD: ${{ secrets.MSIX_SIGNING_PFX_PASSWORD }}
+        run: |
+          if (-not $env:MSIX_SIGNING_PFX_BASE64 -or -not $env:MSIX_SIGNING_PFX_PASSWORD) {
+            throw 'Set MSIX_SIGNING_PFX_BASE64 and MSIX_SIGNING_PFX_PASSWORD in Actions secrets.'
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP 'wino-fork-signing.pfx'
+          try {
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:MSIX_SIGNING_PFX_BASE64))
+            $password = ConvertTo-SecureString $env:MSIX_SIGNING_PFX_PASSWORD -AsPlainText -Force
+            $certificates = @(Import-PfxCertificate -FilePath $pfx -Password $password -CertStoreLocation Cert:\CurrentUser\My)
+            if ($certificates.Count -ne 1) { throw 'The PFX must contain a single self-signed code signing certificate.' }
+            "thumbprint=$($certificates[0].Thumbprint)" >> $env:GITHUB_OUTPUT
+          }
+          finally {
+            if (Test-Path -LiteralPath $pfx) { Remove-Item -LiteralPath $pfx -Force }
+          }
+
+      - name: Build and sign Release x64 MSIX
+        env:
+          SIGNING_THUMBPRINT: ${{ steps.signing.outputs.thumbprint }}
+        run: |
+          $outputRoot = Join-Path $env:RUNNER_TEMP 'wino-fork-release'
+          $arguments = @{
+            NonInteractive = $true
+            Fork = $true
+            Architectures = 'x64'
+            ForkRevision = [int]$env:GITHUB_RUN_NUMBER
+            ForkCertificateThumbprint = $env:SIGNING_THUMBPRINT
+            OutputRoot = $outputRoot
+          }
+          ./scripts/release/windows/build-releases.ps1 @arguments
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "RELEASE_OUTPUT=$outputRoot" >> $env:GITHUB_ENV
+
+      - name: Remove signing key
+        if: always() && steps.signing.outputs.thumbprint != ''
+        env:
+          SIGNING_THUMBPRINT: ${{ steps.signing.outputs.thumbprint }}
+        run: Remove-Item -LiteralPath "Cert:\CurrentUser\My\$env:SIGNING_THUMBPRINT" -DeleteKey
+
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $tag = "windows-fork-$env:GITHUB_RUN_NUMBER-$($env:GITHUB_SHA.Substring(0, 12))"
+          $existing = gh release view $tag --json isDraft,targetCommitish 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            $release = $existing | ConvertFrom-Json
+            if ($release.targetCommitish -cne $env:GITHUB_SHA) { throw "Release $tag targets another commit." }
+            if (-not $release.isDraft) { return }
+          }
+          else {
+            $notes = @"
+          Windows x64 の自己署名版です。ZIP を展開し、公開証明書の拇印を配布元に確認してからインストールしてください。
+
+          [インストール手順](https://github.com/$env:GITHUB_REPOSITORY/blob/$env:GITHUB_SHA/docs/windows-fork-release-ja.md#install)
+          "@
+            gh release create $tag --draft --prerelease --latest=false --target $env:GITHUB_SHA `
+              --title "Wino Mail Translate Windows x64 (run $env:GITHUB_RUN_NUMBER)" --notes $notes
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+          $bundles = @(Get-ChildItem -LiteralPath $env:RELEASE_OUTPUT -Recurse -File -Filter 'WinoMailTranslate_*.msixbundle' |
+            Where-Object { $_.Directory.Name -ceq 'Fork' })
+          if ($bundles.Count -ne 1) { throw 'Expected exactly one fork bundle.' }
+          $bundle = $bundles[0]
+          $zip = Join-Path $env:RUNNER_TEMP "$($bundle.BaseName).zip"
+          [IO.Compression.ZipFile]::CreateFromDirectory($bundle.DirectoryName, $zip, 'Fastest', $false)
+          gh release upload $tag $zip --clobber
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          gh release edit $tag --draft=false --latest=false
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

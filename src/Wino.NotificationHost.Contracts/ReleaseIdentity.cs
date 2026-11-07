@@ -47,6 +47,7 @@ public sealed class ReleaseIdentity
             "Store" => "58272BurakKSE.WinoMailPreview",
             "Sideload" => "WinoMail.Sideload",
             "Beta" => "WinoMail.Beta",
+            "Fork" => "Daizu007.WinoMailTranslate",
             _ => throw new InvalidDataException("Unknown release distribution.")
         };
 
